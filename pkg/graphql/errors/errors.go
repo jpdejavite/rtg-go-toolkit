@@ -6,6 +6,9 @@ type CustomError struct {
 	Message string
 }
 
+// NotAuthorizedError not authorized custom error
+var NotAuthorizedError = New("Not_authorized", "Not authorized")
+
 // New is a creator ErrorWrapper struct
 func New(code, message string) error {
 	return CustomError{
@@ -17,4 +20,5 @@ func New(code, message string) error {
 // Error return error message field value
 func (e CustomError) Error() string {
 	return e.Message
+
 }

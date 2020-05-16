@@ -8,10 +8,24 @@ import (
 	"google.golang.org/api/option"
 )
 
-var appDB firebase.App
+// IDBFirestore firestore db interface
+type IDBFirestore interface {
+	ConnectToDatabase(base64ServiceAccount string) error
+	GetDocumentData(collection string, document string) (map[string]interface{}, error)
+}
+
+// NewDBFirestore returns a new db interface
+func NewDBFirestore() IDBFirestore {
+	return DBFirestore{}
+}
+
+// DBFirestore implements IDBFirestore interface
+type DBFirestore struct {
+	appDB *firebase.App
+}
 
 // ConnectToDatabase connect to firestore database using base service account
-func ConnectToDatabase(base64ServiceAccount string) error {
+func (dbFirestore DBFirestore) ConnectToDatabase(base64ServiceAccount string) error {
 	serviceAccount := make([]byte, base64.StdEncoding.DecodedLen(len(base64ServiceAccount)))
 	_, err := base64.StdEncoding.Decode(serviceAccount, []byte(base64ServiceAccount))
 	if err != nil {
@@ -30,14 +44,14 @@ func ConnectToDatabase(base64ServiceAccount string) error {
 	if err != nil {
 		return err
 	}
-	appDB = *app
+	dbFirestore.appDB = app
 	defer client.Close()
 	return nil
 }
 
 // GetDocumentData get firestore document data
-func GetDocumentData(collection string, document string) (map[string]interface{}, error) {
-	client, err := appDB.Firestore(context.Background())
+func (dbFirestore DBFirestore) GetDocumentData(collection string, document string) (map[string]interface{}, error) {
+	client, err := dbFirestore.appDB.Firestore(context.Background())
 	if err != nil {
 		return nil, err
 	}

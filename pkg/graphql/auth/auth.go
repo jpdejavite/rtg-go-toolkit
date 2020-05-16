@@ -12,25 +12,32 @@ import (
 	"github.com/jpdejavite/rtg-go-toolkit/pkg/model"
 )
 
+type key int
+
 const (
-	gatewayTokenHeader = "gateway-token"
+	// GatewayTokenHeader gateway token header
+	GatewayTokenHeader = "gateway-token"
+	// AuthorizationDataKey authorization data key in context
+	AuthorizationDataKey key = iota
+	// GlobalConfigsKey global config key in context
+	GlobalConfigsKey key = iota
 )
 
 /*AddSecurityHandler extracts security credentials sent by gateway from header
 and put into request context app using a standard struct */
-func AddSecurityHandler() func(http.Handler) http.Handler {
+func AddSecurityHandler(gc config.IGlobalConfigs) func(http.Handler) http.Handler {
 
 	addCtx := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Header.Get(gatewayTokenHeader) == "" {
+			if r.Header.Get(GatewayTokenHeader) == "" {
 				http.Error(w, errors.NewGraphqlErrorToJSON("invalid_request", "Invalid request"), 400)
 				return
 			}
 
-			gatewayPublicKey := config.GetGlobalConfigAsStr(config.GatewayPublicKey)
+			gatewayPublicKey := gc.GetGlobalConfigAsStr(config.GatewayPublicKey)
 			gatewayPublicKey = strings.ReplaceAll(gatewayPublicKey, "\\n", "\n")
 
-			gatewayToken := r.Header.Get(gatewayTokenHeader)
+			gatewayToken := r.Header.Get(GatewayTokenHeader)
 			gatewayToken = strings.ReplaceAll(gatewayToken, "Bearer ", "")
 
 			val, err := verifyES512Token(gatewayToken, []byte(gatewayPublicKey))
@@ -50,7 +57,8 @@ func AddSecurityHandler() func(http.Handler) http.Handler {
 				return []byte(gatewayPublicKey), nil
 			})
 			claims := tknPar.Claims.(jwt.MapClaims)
-			ctx := context.WithValue(r.Context(), "authorizationData", claims)
+			ctx := context.WithValue(r.Context(), AuthorizationDataKey, claims)
+			ctx = context.WithValue(ctx, GlobalConfigsKey, gc)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -79,23 +87,27 @@ func verifyES512Token(token string, publicKey []byte) (bool, error) {
 // ValidateHasAllRoles validate has all roles directive
 func ValidateHasAllRoles(ctx context.Context, roles []*string) error {
 
-	reqCred := ctx.Value("authorizationData").(jwt.MapClaims)
+	reqCred := ctx.Value(AuthorizationDataKey).(jwt.MapClaims)
 
-	userRoles := reqCred["roles"].([]interface{})
+	userRoles := reqCred["roles"]
 
 	if userRoles == nil {
-		return errors.New("Not_authorized", "Not authorized")
+		return errors.NotAuthorizedError
+	}
+
+	if len(userRoles.([]interface{})) == 0 {
+		return errors.NotAuthorizedError
 	}
 
 	for _, reqRole := range roles {
 		hasRole := false
-		for _, userRole := range userRoles {
+		for _, userRole := range userRoles.([]interface{}) {
 			if reqRole != nil && *reqRole == userRole {
 				hasRole = true
 			}
 		}
 		if !hasRole {
-			return errors.New("Not_authorized", "Not authorized")
+			return errors.NotAuthorizedError
 		}
 	}
 
