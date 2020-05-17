@@ -98,3 +98,23 @@ func TestLoadGlobalConfigAllOk(t *testing.T) {
 		t.Error(diff)
 	}
 }
+
+func TestGetGlobalConfigAsIntEmpty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	gc := config.NewGlobalConfigs(dbMock)
+
+	if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), 0); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestGetGlobalConfigAsStrEmpty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	gc := config.NewGlobalConfigs(dbMock)
+
+	if diff := deep.Equal(gc.GetGlobalConfigAsStr(config.GatewayPublicKey), ""); diff != nil {
+		t.Error(diff)
+	}
+}

@@ -21,6 +21,7 @@ import (
 const (
 	gatewayPublicKey  = "-----BEGIN PUBLIC KEY-----\nMIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQAQXqqbEeiSK6d27LKcbNusbIUL+mn\nrMRbWx5ZzWLLJgSBUntTEb+GEDQB6vzjEEE4x033bbFMLv+eWFpbjJCwnIMBBpQO\nI9gO61dqPnaQLpnsFmHAeGRsBRif9zULvEbteTEstzMRKXP5eNzhPkmNfXT2sA6/\nOy7hTo82fAcNCEWK1uk=\n-----END PUBLIC KEY-----"
 	gatewayPrivateKey = "-----BEGIN EC PRIVATE KEY-----\nMIHcAgEBBEIB7N7HkaB+pXzBlsSt+SIWd4IOpkT2ggax+rM7WqJqULBhjdU1LzSl\nzkrLMT9eWb0rI/urTZ/rh7aoYSKO0jgCe+GgBwYFK4EEACOhgYkDgYYABABBeqps\nR6JIrp3bsspxs26xshQv6aesxFtbHlnNYssmBIFSe1MRv4YQNAHq/OMQQTjHTfdt\nsUwu/55YWluMkLCcgwEGlA4j2A7rV2o+dpAumewWYcB4ZGwFGJ/3NQu8Ru15MSy3\nMxEpc/l43OE+SY19dPawDr87LuFOjzZ8Bw0IRYrW6Q==\n-----END EC PRIVATE KEY-----"
+	anotherPrivateKey = "-----BEGIN EC PRIVATE KEY-----\nMIHcAgEBBEIBNc8Nk2PhwDY17h5pShIoa/MID0Qx1gJtHg4KJwpM0pJ98ZYb+hZw\n+TaCgxTIVzhNEpODTQ2xgzTglpFHafnKvbSgBwYFK4EEACOhgYkDgYYABACITUWX\nKX8Bvuw6bSBJ8GJjjwQP8JuUFTDQfhNhlGun5VLHar9vAcrndyIpAgV7kbPN+iDN\nJq9vl6SzMwqmU6TtaQEZ27Jm8wq35BfHKKGOnDyQvKJrllmthQ4eme63TcKdnATa\nv5sHSsERZB0t957y+rhonRjly4t27Iqdyc2o8bX9AQ==\n-----END EC PRIVATE KEY-----"
 )
 
 func TestValidateHasAllRolesNilRoles(t *testing.T) {
@@ -158,6 +159,36 @@ func TestAddSecurityHandlerInvalidToken(t *testing.T) {
 	}
 }
 
+func TestAddSecurityHandlerInvalidTokenSignature(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	configMock := mock_config.NewMockIGlobalConfigs(ctrl)
+
+	configMock.EXPECT().
+		GetGlobalConfigAsStr(config.GatewayPublicKey).
+		Return(gatewayPublicKey)
+
+	req, err := http.NewRequest("POST", "/validate", nil)
+	req.Header.Set(auth.GatewayTokenHeader, generateToken(anotherPrivateKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := auth.AddSecurityHandler(configMock)(nil)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+
+	got := strings.ReplaceAll(rr.Body.String(), "\n", "")
+	expect := strings.ReplaceAll(errors.NewGraphqlErrorToJSON("invalid_gateway_token", "Invalid gateway token"), "\n", "")
+	if diff := deep.Equal(got, expect); diff != nil {
+		t.Error(diff)
+	}
+}
+
 func TestAddSecurityHandlerValidToken(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	configMock := mock_config.NewMockIGlobalConfigs(ctrl)
@@ -167,7 +198,7 @@ func TestAddSecurityHandlerValidToken(t *testing.T) {
 		Return(gatewayPublicKey)
 
 	req, err := http.NewRequest("POST", "/validate", nil)
-	req.Header.Set(auth.GatewayTokenHeader, generateToken())
+	req.Header.Set(auth.GatewayTokenHeader, generateToken(gatewayPrivateKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,12 +227,12 @@ func (okHandler oKHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "OK")
 }
 
-func generateToken() string {
+func generateToken(privateKey string) string {
 	// Declare the token with the algorithm used for signing, and the claims
 	token := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.StandardClaims{})
 	// Create the JWT string
 
-	key, err := jwt.ParseECPrivateKeyFromPEM([]byte(gatewayPrivateKey))
+	key, err := jwt.ParseECPrivateKeyFromPEM([]byte(privateKey))
 	if err != nil {
 		panic(err)
 	}
