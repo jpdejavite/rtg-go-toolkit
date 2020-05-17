@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/jpdejavite/go-log/pkg/log"
@@ -47,9 +48,20 @@ func (c Configs) LoadConfig(app string, keys []string) error {
 	}
 
 	for _, k := range keys {
+		if os.Getenv(k) != "" {
+			if c.configs[k] == nil {
+				log.Info("config", "override config", OverrideMeta{k}, log.GenerateCoi(nil))
+			}
+			c.configs[k] = os.Getenv(k)
+			continue
+		}
 		data := ConfigData[k]
 		if data == nil || data == "" {
 			return fmt.Errorf("missing config %s", k)
+		}
+
+		if c.configs[k] != data {
+			log.Info("config", "setting config", OverrideMeta{k}, log.GenerateCoi(nil))
 		}
 		c.configs[k] = data
 	}

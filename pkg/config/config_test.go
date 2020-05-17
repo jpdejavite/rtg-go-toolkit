@@ -3,6 +3,7 @@ package config_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -99,6 +100,36 @@ func TestLoadConfigAllOk(t *testing.T) {
 	} else if diff := deep.Equal(c.GetConfigAsStr("config1"), config1); diff != nil {
 		t.Error(diff)
 	} else if diff := deep.Equal(c.GetConfigAsInt("config2"), config2); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestLoadConfigAllOkOverrideEnvVar(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	c := config.NewConfigs(dbMock)
+
+	app := "myapp"
+	keys := []string{"config1", "config3"}
+
+	config1 := "jahwidh93u"
+	config3 := "2jf1023"
+	os.Setenv("config3", "ejw19208o")
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", app).
+		Return(map[string]interface{}{
+			"config1": config1,
+			"config3": config3,
+		}, nil)
+
+	got := c.LoadConfig(app, keys)
+
+	if got != nil {
+		t.Errorf("Error not expected %v, nil expected", got)
+	} else if diff := deep.Equal(c.GetConfigAsStr("config1"), config1); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsStr("config3"), "ejw19208o"); diff != nil {
 		t.Error(diff)
 	}
 }

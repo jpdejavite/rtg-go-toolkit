@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/jpdejavite/go-log/pkg/log"
@@ -19,6 +20,10 @@ const (
 	// RefreshConfigTimeoutInSeconds config timetout to refresh configs from db (in seconds)
 	RefreshConfigTimeoutInSeconds = "refreshConfigTimeoutInSeconds"
 )
+
+type OverrideMeta struct {
+	Key string
+}
 
 // IGlobalConfigs global configs interface
 type IGlobalConfigs interface {
@@ -58,9 +63,21 @@ func (gc GlobalConfigs) LoadGlobalConfig() error {
 	}
 
 	for _, k := range gc.GetGlobalKeys() {
+		if os.Getenv(k) != "" {
+			if gc.configs[k] == nil {
+				log.Info("globalconfig", "override config", OverrideMeta{k}, log.GenerateCoi(nil))
+			}
+			gc.configs[k] = os.Getenv(k)
+			continue
+		}
+
 		data := globalConfigData[k]
 		if data == nil || data == "" {
 			return fmt.Errorf("missing global config %s", k)
+		}
+
+		if gc.configs[k] != data {
+			log.Info("globalconfig", "setting config", OverrideMeta{k}, log.GenerateCoi(nil))
 		}
 
 		gc.configs[k] = data

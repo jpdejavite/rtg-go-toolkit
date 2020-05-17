@@ -3,6 +3,7 @@ package config_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -82,6 +83,7 @@ func TestLoadGlobalConfigAllOk(t *testing.T) {
 	gatewayPublicKey := "GatewayPublicKey"
 	tokenExpirationInMinutes := 2
 	refreshConfigTimeoutInSeconds := 300
+	os.Setenv(config.GatewayPublicKey, "")
 
 	dbMock.EXPECT().
 		GetDocumentData("configs", "global").
@@ -104,6 +106,38 @@ func TestLoadGlobalConfigAllOk(t *testing.T) {
 	}
 }
 
+func TestLoadGlobalConfigOverrideEnvVar(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	gc := config.NewGlobalConfigs(dbMock)
+
+	gatewayPublicKey := "GatewayPublicKey"
+	tokenExpirationInMinutes := 2
+	refreshConfigTimeoutInSeconds := 300
+
+	os.Setenv(config.GatewayPublicKey, "huahuahu")
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", "global").
+		Return(map[string]interface{}{
+			config.GatewayPublicKey:              gatewayPublicKey,
+			config.TokenExpirationInMinutes:      tokenExpirationInMinutes,
+			config.RefreshConfigTimeoutInSeconds: refreshConfigTimeoutInSeconds,
+		}, nil)
+
+	got := gc.LoadGlobalConfig()
+
+	if got != nil {
+		t.Errorf("Error not expected %v, nil expected", got)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsStr(config.GatewayPublicKey), "huahuahu"); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), tokenExpirationInMinutes); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.RefreshConfigTimeoutInSeconds), refreshConfigTimeoutInSeconds); diff != nil {
+		t.Error(diff)
+	}
+}
+
 func TestLoadGlobalConfigRefreshData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
@@ -112,6 +146,7 @@ func TestLoadGlobalConfigRefreshData(t *testing.T) {
 	gatewayPublicKey := "GatewayPublicKey"
 	tokenExpirationInMinutes := 2
 	refreshConfigTimeoutInSeconds := 300
+	os.Setenv(config.GatewayPublicKey, "")
 
 	dbMock.EXPECT().
 		GetDocumentData("configs", "global").
@@ -151,6 +186,7 @@ func TestLoadGlobalConfigRefreshDataError(t *testing.T) {
 
 	gatewayPublicKey := "GatewayPublicKey"
 	tokenExpirationInMinutes := 2
+	os.Setenv(config.GatewayPublicKey, "")
 
 	dbMock.EXPECT().
 		GetDocumentData("configs", "global").
