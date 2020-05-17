@@ -19,9 +19,12 @@ const (
 	TokenExpirationInMinutes = "tokenExpirationInMinutes"
 	// RefreshConfigTimeoutInSeconds config timetout to refresh configs from db (in seconds)
 	RefreshConfigTimeoutInSeconds = "refreshConfigTimeoutInSeconds"
+	// DefaultRefreshTimeoutInSeconds default config timetout to refresh configs from db (in seconds)
+	DefaultRefreshTimeoutInSeconds = 30
 )
 
-type OverrideMeta struct {
+// KeyMeta metadata for override key
+type KeyMeta struct {
 	Key string
 }
 
@@ -30,6 +33,7 @@ type IGlobalConfigs interface {
 	GetGlobalKeys() []string
 	LoadGlobalConfig() error
 	GetGlobalConfigAsInt(key string) int
+	GetGlobalConfigAsInt64(key string) int64
 	GetGlobalConfigAsStr(key string) string
 }
 
@@ -65,7 +69,7 @@ func (gc GlobalConfigs) LoadGlobalConfig() error {
 	for _, k := range gc.GetGlobalKeys() {
 		if os.Getenv(k) != "" {
 			if gc.configs[k] == nil {
-				log.Info("globalconfig", "override config", OverrideMeta{k}, log.GenerateCoi(nil))
+				log.Info("globalconfig", "override config", KeyMeta{k}, log.GenerateCoi(nil))
 			}
 			gc.configs[k] = os.Getenv(k)
 			continue
@@ -77,7 +81,7 @@ func (gc GlobalConfigs) LoadGlobalConfig() error {
 		}
 
 		if gc.configs[k] != data {
-			log.Info("globalconfig", "setting config", OverrideMeta{k}, log.GenerateCoi(nil))
+			log.Info("globalconfig", "setting config", KeyMeta{k}, log.GenerateCoi(nil))
 		}
 
 		gc.configs[k] = data
@@ -89,7 +93,11 @@ func (gc GlobalConfigs) LoadGlobalConfig() error {
 
 func (gc GlobalConfigs) refreshGlobalConfig() {
 	for {
-		time.Sleep(time.Duration(gc.GetGlobalConfigAsInt(RefreshConfigTimeoutInSeconds)) * time.Second)
+		sleepSeconds := DefaultRefreshTimeoutInSeconds
+		if gc.GetGlobalConfigAsInt(RefreshConfigTimeoutInSeconds) != 0 {
+			sleepSeconds = gc.GetGlobalConfigAsInt(RefreshConfigTimeoutInSeconds)
+		}
+		time.Sleep(time.Duration(sleepSeconds) * time.Second)
 		if err := gc.LoadGlobalConfig(); err != nil {
 			log.Error("globalconfig", "error LoadGlobalConfig", model.NewMetaError(err), log.GenerateCoi(nil))
 			break
@@ -104,7 +112,34 @@ func (gc GlobalConfigs) GetGlobalConfigAsInt(key string) int {
 	if val == nil {
 		return 0
 	}
-	return val.(int)
+
+	switch val.(type) {
+	case float64:
+		return int(val.(float64))
+	case int:
+		return val.(int)
+	case int64:
+		return int(val.(int64))
+	}
+	return 0
+}
+
+// GetGlobalConfigAsInt64 get global config as int64
+func (gc GlobalConfigs) GetGlobalConfigAsInt64(key string) int64 {
+	val := gc.configs[key]
+	if val == nil {
+		return int64(0)
+	}
+
+	switch val.(type) {
+	case float64:
+		return int64(val.(float64))
+	case int:
+		return int64(val.(int))
+	case int64:
+		return val.(int64)
+	}
+	return int64(0)
 }
 
 // GetGlobalConfigAsStr get global config as string

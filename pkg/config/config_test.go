@@ -81,16 +81,30 @@ func TestLoadConfigAllOk(t *testing.T) {
 	c := config.NewConfigs(dbMock)
 
 	app := "myapp"
-	keys := []string{"config1", "config2"}
+	keys := []string{"config1", "config2", "config3", "config4", "config5", "config6", "config7", "config8", "config9"}
 
 	config1 := "jahwidh93u"
 	config2 := 12491
+	config3 := int64(63123)
+	config4 := float64(861792831)
+	config5 := 12491
+	config6 := int64(1263123)
+	config7 := float64(861792831)
+	config8 := "1263123"
+	config9 := "861792831"
 
 	dbMock.EXPECT().
 		GetDocumentData("configs", app).
 		Return(map[string]interface{}{
 			"config1": config1,
 			"config2": config2,
+			"config3": config3,
+			"config4": config4,
+			"config5": config5,
+			"config6": config6,
+			"config7": config7,
+			"config8": config8,
+			"config9": config9,
 		}, nil)
 
 	got := c.LoadConfig(app, keys)
@@ -101,6 +115,20 @@ func TestLoadConfigAllOk(t *testing.T) {
 		t.Error(diff)
 	} else if diff := deep.Equal(c.GetConfigAsInt("config2"), config2); diff != nil {
 		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt("config3"), int(config3)); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt("config4"), int(config4)); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt64("config5"), int64(config5)); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt64("config6"), config6); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt64("config7"), int64(config7)); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt("config8"), 0); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt64("config9"), int64(0)); diff != nil {
+		t.Error(diff)
 	}
 }
 
@@ -110,17 +138,17 @@ func TestLoadConfigAllOkOverrideEnvVar(t *testing.T) {
 	c := config.NewConfigs(dbMock)
 
 	app := "myapp"
-	keys := []string{"config1", "config3"}
+	keys := []string{"config1", "new_config"}
 
 	config1 := "jahwidh93u"
 	config3 := "2jf1023"
-	os.Setenv("config3", "ejw19208o")
+	os.Setenv("new_config", "ejw19208o")
 
 	dbMock.EXPECT().
 		GetDocumentData("configs", app).
 		Return(map[string]interface{}{
-			"config1": config1,
-			"config3": config3,
+			"config1":    config1,
+			"new_config": config3,
 		}, nil)
 
 	got := c.LoadConfig(app, keys)
@@ -129,7 +157,7 @@ func TestLoadConfigAllOkOverrideEnvVar(t *testing.T) {
 		t.Errorf("Error not expected %v, nil expected", got)
 	} else if diff := deep.Equal(c.GetConfigAsStr("config1"), config1); diff != nil {
 		t.Error(diff)
-	} else if diff := deep.Equal(c.GetConfigAsStr("config3"), "ejw19208o"); diff != nil {
+	} else if diff := deep.Equal(c.GetConfigAsStr("new_config"), "ejw19208o"); diff != nil {
 		t.Error(diff)
 	}
 }
@@ -219,6 +247,16 @@ func TestGetConfigAsIntEmpty(t *testing.T) {
 	c := config.NewConfigs(dbMock)
 
 	if diff := deep.Equal(c.GetConfigAsInt(config.TokenExpirationInMinutes), 0); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestGetConfigAsInt64Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	c := config.NewConfigs(dbMock)
+
+	if diff := deep.Equal(c.GetConfigAsInt64(config.TokenExpirationInMinutes), int64(0)); diff != nil {
 		t.Error(diff)
 	}
 }

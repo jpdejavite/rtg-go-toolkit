@@ -81,8 +81,8 @@ func TestLoadGlobalConfigAllOk(t *testing.T) {
 	gc := config.NewGlobalConfigs(dbMock)
 
 	gatewayPublicKey := "GatewayPublicKey"
-	tokenExpirationInMinutes := 2
-	refreshConfigTimeoutInSeconds := 300
+	tokenExpirationInMinutes := int64(2)
+	refreshConfigTimeoutInSeconds := float64(300)
 	os.Setenv(config.GatewayPublicKey, "")
 
 	dbMock.EXPECT().
@@ -99,9 +99,40 @@ func TestLoadGlobalConfigAllOk(t *testing.T) {
 		t.Errorf("Error not expected %v, nil expected", got)
 	} else if diff := deep.Equal(gc.GetGlobalConfigAsStr(config.GatewayPublicKey), gatewayPublicKey); diff != nil {
 		t.Error(diff)
-	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), tokenExpirationInMinutes); diff != nil {
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), int(tokenExpirationInMinutes)); diff != nil {
 		t.Error(diff)
-	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.RefreshConfigTimeoutInSeconds), refreshConfigTimeoutInSeconds); diff != nil {
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.RefreshConfigTimeoutInSeconds), int(refreshConfigTimeoutInSeconds)); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestLoadGlobalConfigAllOkWrongTypes(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	gc := config.NewGlobalConfigs(dbMock)
+
+	gatewayPublicKey := "GatewayPublicKey"
+	tokenExpirationInMinutes := "2"
+	refreshConfigTimeoutInSeconds := "300"
+	os.Setenv(config.GatewayPublicKey, "")
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", "global").
+		Return(map[string]interface{}{
+			config.GatewayPublicKey:              gatewayPublicKey,
+			config.TokenExpirationInMinutes:      tokenExpirationInMinutes,
+			config.RefreshConfigTimeoutInSeconds: refreshConfigTimeoutInSeconds,
+		}, nil)
+
+	got := gc.LoadGlobalConfig()
+
+	if got != nil {
+		t.Errorf("Error not expected %v, nil expected", got)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsStr(config.GatewayPublicKey), gatewayPublicKey); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), int(0)); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt64(config.RefreshConfigTimeoutInSeconds), int64(0)); diff != nil {
 		t.Error(diff)
 	}
 }
@@ -112,8 +143,8 @@ func TestLoadGlobalConfigOverrideEnvVar(t *testing.T) {
 	gc := config.NewGlobalConfigs(dbMock)
 
 	gatewayPublicKey := "GatewayPublicKey"
-	tokenExpirationInMinutes := 2
-	refreshConfigTimeoutInSeconds := 300
+	tokenExpirationInMinutes := int64(2)
+	refreshConfigTimeoutInSeconds := float64(300)
 
 	os.Setenv(config.GatewayPublicKey, "huahuahu")
 
@@ -131,9 +162,9 @@ func TestLoadGlobalConfigOverrideEnvVar(t *testing.T) {
 		t.Errorf("Error not expected %v, nil expected", got)
 	} else if diff := deep.Equal(gc.GetGlobalConfigAsStr(config.GatewayPublicKey), "huahuahu"); diff != nil {
 		t.Error(diff)
-	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), tokenExpirationInMinutes); diff != nil {
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt64(config.TokenExpirationInMinutes), tokenExpirationInMinutes); diff != nil {
 		t.Error(diff)
-	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.RefreshConfigTimeoutInSeconds), refreshConfigTimeoutInSeconds); diff != nil {
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt64(config.RefreshConfigTimeoutInSeconds), int64(refreshConfigTimeoutInSeconds)); diff != nil {
 		t.Error(diff)
 	}
 }
@@ -213,7 +244,7 @@ func TestLoadGlobalConfigRefreshDataError(t *testing.T) {
 		t.Error(diff)
 	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), tokenExpirationInMinutes); diff != nil {
 		t.Error(diff)
-	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.RefreshConfigTimeoutInSeconds), 1); diff != nil {
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt64(config.RefreshConfigTimeoutInSeconds), int64(1)); diff != nil {
 		t.Error(diff)
 	}
 }
@@ -224,6 +255,16 @@ func TestGetGlobalConfigAsIntEmpty(t *testing.T) {
 	gc := config.NewGlobalConfigs(dbMock)
 
 	if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), 0); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestGetGlobalConfigAsInt64Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	gc := config.NewGlobalConfigs(dbMock)
+
+	if diff := deep.Equal(gc.GetGlobalConfigAsInt64(config.TokenExpirationInMinutes), int64(0)); diff != nil {
 		t.Error(diff)
 	}
 }

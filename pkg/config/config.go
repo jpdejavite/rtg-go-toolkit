@@ -11,15 +11,11 @@ import (
 	"github.com/jpdejavite/rtg-go-toolkit/pkg/model"
 )
 
-const (
-	// DefaultRefreshTimeoutInSeconds default config timetout to refresh configs from db (in seconds)
-	DefaultRefreshTimeoutInSeconds = 30
-)
-
 // IConfigs configs interface
 type IConfigs interface {
 	LoadConfig(app string, keys []string) error
 	GetConfigAsInt(key string) int
+	GetConfigAsInt64(key string) int64
 	GetConfigAsStr(key string) string
 }
 
@@ -50,7 +46,7 @@ func (c Configs) LoadConfig(app string, keys []string) error {
 	for _, k := range keys {
 		if os.Getenv(k) != "" {
 			if c.configs[k] == nil {
-				log.Info("config", "override config", OverrideMeta{k}, log.GenerateCoi(nil))
+				log.Info("config", "override config", KeyMeta{k}, log.GenerateCoi(nil))
 			}
 			c.configs[k] = os.Getenv(k)
 			continue
@@ -61,7 +57,7 @@ func (c Configs) LoadConfig(app string, keys []string) error {
 		}
 
 		if c.configs[k] != data {
-			log.Info("config", "setting config", OverrideMeta{k}, log.GenerateCoi(nil))
+			log.Info("config", "setting config", KeyMeta{k}, log.GenerateCoi(nil))
 		}
 		c.configs[k] = data
 	}
@@ -93,7 +89,34 @@ func (c Configs) GetConfigAsInt(key string) int {
 	if val == nil {
 		return 0
 	}
-	return val.(int)
+
+	switch val.(type) {
+	case float64:
+		return int(val.(float64))
+	case int:
+		return val.(int)
+	case int64:
+		return int(val.(int64))
+	}
+	return 0
+}
+
+// GetConfigAsInt64 get global config as int64
+func (c Configs) GetConfigAsInt64(key string) int64 {
+	val := c.configs[key]
+	if val == nil {
+		return int64(0)
+	}
+
+	switch val.(type) {
+	case float64:
+		return int64(val.(float64))
+	case int:
+		return int64(val.(int))
+	case int64:
+		return val.(int64)
+	}
+	return int64(0)
 }
 
 // GetConfigAsStr get  config as string

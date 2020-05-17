@@ -74,6 +74,20 @@ func (mr *MockIGlobalConfigsMockRecorder) GetGlobalConfigAsInt(key interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGlobalConfigAsInt", reflect.TypeOf((*MockIGlobalConfigs)(nil).GetGlobalConfigAsInt), key)
 }
 
+// GetGlobalConfigAsInt64 mocks base method
+func (m *MockIGlobalConfigs) GetGlobalConfigAsInt64(key string) int64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetGlobalConfigAsInt64", key)
+	ret0, _ := ret[0].(int64)
+	return ret0
+}
+
+// GetGlobalConfigAsInt64 indicates an expected call of GetGlobalConfigAsInt64
+func (mr *MockIGlobalConfigsMockRecorder) GetGlobalConfigAsInt64(key interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGlobalConfigAsInt64", reflect.TypeOf((*MockIGlobalConfigs)(nil).GetGlobalConfigAsInt64), key)
+}
+
 // GetGlobalConfigAsStr mocks base method
 func (m *MockIGlobalConfigs) GetGlobalConfigAsStr(key string) string {
 	m.ctrl.T.Helper()
