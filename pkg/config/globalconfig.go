@@ -3,8 +3,12 @@ package config
 import (
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/jpdejavite/go-log/pkg/log"
 
 	"github.com/jpdejavite/rtg-go-toolkit/pkg/firestore"
+	"github.com/jpdejavite/rtg-go-toolkit/pkg/model"
 )
 
 const (
@@ -12,6 +16,8 @@ const (
 	GatewayPublicKey = "gatewayPublicKey"
 	// TokenExpirationInMinutes token expiration in minutes
 	TokenExpirationInMinutes = "tokenExpirationInMinutes"
+	// RefreshConfigTimeoutInSeconds config timetout to refresh configs from db (in seconds)
+	RefreshConfigTimeoutInSeconds = "refreshConfigTimeoutInSeconds"
 )
 
 // IGlobalConfigs global configs interface
@@ -38,7 +44,7 @@ type GlobalConfigs struct {
 
 // GetGlobalKeys return list of global config keys
 func (gc GlobalConfigs) GetGlobalKeys() []string {
-	return []string{GatewayPublicKey, TokenExpirationInMinutes}
+	return []string{GatewayPublicKey, TokenExpirationInMinutes, RefreshConfigTimeoutInSeconds}
 }
 
 // LoadGlobalConfig load all global configs
@@ -52,12 +58,27 @@ func (gc GlobalConfigs) LoadGlobalConfig() error {
 	}
 
 	for _, k := range gc.GetGlobalKeys() {
-		gc.configs[k] = globalConfigData[k]
-		if gc.configs[k] == nil || gc.configs[k] == "" {
+		data := globalConfigData[k]
+		if data == nil || data == "" {
 			return fmt.Errorf("missing global config %s", k)
 		}
+
+		gc.configs[k] = data
 	}
+
+	go gc.refreshGlobalConfig()
 	return nil
+}
+
+func (gc GlobalConfigs) refreshGlobalConfig() {
+	for {
+		time.Sleep(time.Duration(gc.GetGlobalConfigAsInt(RefreshConfigTimeoutInSeconds)) * time.Second)
+		if err := gc.LoadGlobalConfig(); err != nil {
+			log.Error("globalconfig", "error LoadGlobalConfig", model.NewMetaError(err), log.GenerateCoi(nil))
+			break
+		}
+
+	}
 }
 
 // GetGlobalConfigAsInt get global config as int

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/go-test/deep"
 	"github.com/golang/mock/gomock"
@@ -14,7 +15,7 @@ import (
 func TestGetGlobalKeys(t *testing.T) {
 	gc := config.NewGlobalConfigs(nil)
 	got := gc.GetGlobalKeys()
-	expect := []string{config.GatewayPublicKey, config.TokenExpirationInMinutes}
+	expect := []string{config.GatewayPublicKey, config.TokenExpirationInMinutes, config.RefreshConfigTimeoutInSeconds}
 	if diff := deep.Equal(got, expect); diff != nil {
 		t.Error(diff)
 	}
@@ -80,6 +81,84 @@ func TestLoadGlobalConfigAllOk(t *testing.T) {
 
 	gatewayPublicKey := "GatewayPublicKey"
 	tokenExpirationInMinutes := 2
+	refreshConfigTimeoutInSeconds := 300
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", "global").
+		Return(map[string]interface{}{
+			config.GatewayPublicKey:              gatewayPublicKey,
+			config.TokenExpirationInMinutes:      tokenExpirationInMinutes,
+			config.RefreshConfigTimeoutInSeconds: refreshConfigTimeoutInSeconds,
+		}, nil)
+
+	got := gc.LoadGlobalConfig()
+
+	if got != nil {
+		t.Errorf("Error not expected %v, nil expected", got)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsStr(config.GatewayPublicKey), gatewayPublicKey); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), tokenExpirationInMinutes); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.RefreshConfigTimeoutInSeconds), refreshConfigTimeoutInSeconds); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestLoadGlobalConfigRefreshData(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	gc := config.NewGlobalConfigs(dbMock)
+
+	gatewayPublicKey := "GatewayPublicKey"
+	tokenExpirationInMinutes := 2
+	refreshConfigTimeoutInSeconds := 300
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", "global").
+		Return(map[string]interface{}{
+			config.GatewayPublicKey:              gatewayPublicKey,
+			config.TokenExpirationInMinutes:      tokenExpirationInMinutes,
+			config.RefreshConfigTimeoutInSeconds: 1,
+		}, nil)
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", "global").
+		Return(map[string]interface{}{
+			config.GatewayPublicKey:              gatewayPublicKey,
+			config.TokenExpirationInMinutes:      tokenExpirationInMinutes,
+			config.RefreshConfigTimeoutInSeconds: refreshConfigTimeoutInSeconds,
+		}, nil)
+
+	got := gc.LoadGlobalConfig()
+
+	time.Sleep(2 * time.Second)
+
+	if got != nil {
+		t.Errorf("Error not expected %v, nil expected", got)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsStr(config.GatewayPublicKey), gatewayPublicKey); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), tokenExpirationInMinutes); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.RefreshConfigTimeoutInSeconds), refreshConfigTimeoutInSeconds); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestLoadGlobalConfigRefreshDataError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	gc := config.NewGlobalConfigs(dbMock)
+
+	gatewayPublicKey := "GatewayPublicKey"
+	tokenExpirationInMinutes := 2
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", "global").
+		Return(map[string]interface{}{
+			config.GatewayPublicKey:              gatewayPublicKey,
+			config.TokenExpirationInMinutes:      tokenExpirationInMinutes,
+			config.RefreshConfigTimeoutInSeconds: 1,
+		}, nil)
 
 	dbMock.EXPECT().
 		GetDocumentData("configs", "global").
@@ -90,11 +169,15 @@ func TestLoadGlobalConfigAllOk(t *testing.T) {
 
 	got := gc.LoadGlobalConfig()
 
+	time.Sleep(2 * time.Second)
+
 	if got != nil {
-		t.Errorf("Error not expetcted %v, nil expected", got)
+		t.Errorf("Error not expected %v, nil expected", got)
 	} else if diff := deep.Equal(gc.GetGlobalConfigAsStr(config.GatewayPublicKey), gatewayPublicKey); diff != nil {
 		t.Error(diff)
 	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.TokenExpirationInMinutes), tokenExpirationInMinutes); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(gc.GetGlobalConfigAsInt(config.RefreshConfigTimeoutInSeconds), 1); diff != nil {
 		t.Error(diff)
 	}
 }

@@ -3,8 +3,16 @@ package config
 import (
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/jpdejavite/go-log/pkg/log"
 	"github.com/jpdejavite/rtg-go-toolkit/pkg/firestore"
+	"github.com/jpdejavite/rtg-go-toolkit/pkg/model"
+)
+
+const (
+	// DefaultRefreshTimeoutInSeconds default config timetout to refresh configs from db (in seconds)
+	DefaultRefreshTimeoutInSeconds = 30
 )
 
 // IConfigs configs interface
@@ -39,12 +47,32 @@ func (c Configs) LoadConfig(app string, keys []string) error {
 	}
 
 	for _, k := range keys {
-		c.configs[k] = ConfigData[k]
-		if c.configs[k] == nil || c.configs[k] == "" {
+		data := ConfigData[k]
+		if data == nil || data == "" {
 			return fmt.Errorf("missing config %s", k)
 		}
+		c.configs[k] = data
 	}
+
+	c.configs[RefreshConfigTimeoutInSeconds] = ConfigData[RefreshConfigTimeoutInSeconds]
+
+	go c.refreshConfig(app, keys)
 	return nil
+}
+
+func (c Configs) refreshConfig(app string, keys []string) {
+	for {
+		sleepSeconds := DefaultRefreshTimeoutInSeconds
+		if c.GetConfigAsInt(RefreshConfigTimeoutInSeconds) != 0 {
+			sleepSeconds = c.GetConfigAsInt(RefreshConfigTimeoutInSeconds)
+		}
+		time.Sleep(time.Duration(sleepSeconds) * time.Second)
+		if err := c.LoadConfig(app, keys); err != nil {
+			log.Error("config", "error LoadConfig", model.NewMetaError(err), log.GenerateCoi(nil))
+			break
+		}
+
+	}
 }
 
 // GetConfigAsInt get  config as int

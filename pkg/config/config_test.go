@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/go-test/deep"
 	"github.com/golang/mock/gomock"
@@ -94,7 +95,86 @@ func TestLoadConfigAllOk(t *testing.T) {
 	got := c.LoadConfig(app, keys)
 
 	if got != nil {
-		t.Errorf("Error not expetcted %v, nil expected", got)
+		t.Errorf("Error not expected %v, nil expected", got)
+	} else if diff := deep.Equal(c.GetConfigAsStr("config1"), config1); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt("config2"), config2); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestLoadConfigAllOkRefreshConfig(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	c := config.NewConfigs(dbMock)
+
+	app := "myapp"
+	keys := []string{"config1", "config2"}
+
+	config1 := "jahwidh93u"
+	config2 := 12491
+	config3 := 280312
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", app).
+		Return(map[string]interface{}{
+			"config1": config1,
+			"config2": config2,
+			config.RefreshConfigTimeoutInSeconds: 1,
+		}, nil)
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", app).
+		Return(map[string]interface{}{
+			"config1": config1,
+			"config2": config3,
+			config.RefreshConfigTimeoutInSeconds: 300,
+		}, nil)
+
+	got := c.LoadConfig(app, keys)
+
+	time.Sleep(2 * time.Second)
+
+	if got != nil {
+		t.Errorf("Error not expected %v, nil expected", got)
+	} else if diff := deep.Equal(c.GetConfigAsStr("config1"), config1); diff != nil {
+		t.Error(diff)
+	} else if diff := deep.Equal(c.GetConfigAsInt("config2"), config3); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestLoadConfigAllOkRefreshConfigError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := mock_firestore.NewMockIDBFirestore(ctrl)
+	c := config.NewConfigs(dbMock)
+
+	app := "myapp"
+	keys := []string{"config1", "config2"}
+
+	config1 := "jahwidh93u"
+	config2 := 12491
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", app).
+		Return(map[string]interface{}{
+			"config1": config1,
+			"config2": config2,
+			config.RefreshConfigTimeoutInSeconds: 1,
+		}, nil)
+
+	dbMock.EXPECT().
+		GetDocumentData("configs", app).
+		Return(map[string]interface{}{
+			"config1": config1,
+		}, nil)
+
+	got := c.LoadConfig(app, keys)
+
+	time.Sleep(2 * time.Second)
+
+	if got != nil {
+		t.Errorf("Error not expected %v, nil expected", got)
 	} else if diff := deep.Equal(c.GetConfigAsStr("config1"), config1); diff != nil {
 		t.Error(diff)
 	} else if diff := deep.Equal(c.GetConfigAsInt("config2"), config2); diff != nil {
