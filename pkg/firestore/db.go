@@ -10,26 +10,25 @@ import (
 
 // IDBFirestore firestore db interface
 type IDBFirestore interface {
-	ConnectToDatabase(base64ServiceAccount string) error
 	GetDocumentData(collection string, document string) (map[string]interface{}, error)
 }
 
 // NewDBFirestore returns a new db interface
-func NewDBFirestore() IDBFirestore {
-	return DBFirestore{}
+func NewDBFirestore(AppDB firebase.App) IDBFirestore {
+	return DBFirestore{AppDB}
 }
 
 // DBFirestore implements IDBFirestore interface
 type DBFirestore struct {
-	appDB *firebase.App
+	AppDB firebase.App
 }
 
 // ConnectToDatabase connect to firestore database using base service account
-func (dbFirestore DBFirestore) ConnectToDatabase(base64ServiceAccount string) error {
+func ConnectToDatabase(base64ServiceAccount string) (IDBFirestore, error) {
 	serviceAccount := make([]byte, base64.StdEncoding.DecodedLen(len(base64ServiceAccount)))
 	_, err := base64.StdEncoding.Decode(serviceAccount, []byte(base64ServiceAccount))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Use a service account
@@ -37,21 +36,20 @@ func (dbFirestore DBFirestore) ConnectToDatabase(base64ServiceAccount string) er
 	sa := option.WithCredentialsJSON(serviceAccount)
 	app, err := firebase.NewApp(ctx, nil, sa)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	client, err := app.Firestore(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	dbFirestore.appDB = app
 	defer client.Close()
-	return nil
+	return DBFirestore{AppDB: *app}, nil
 }
 
 // GetDocumentData get firestore document data
 func (dbFirestore DBFirestore) GetDocumentData(collection string, document string) (map[string]interface{}, error) {
-	client, err := dbFirestore.appDB.Firestore(context.Background())
+	client, err := dbFirestore.AppDB.Firestore(context.Background())
 	if err != nil {
 		return nil, err
 	}
