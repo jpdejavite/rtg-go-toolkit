@@ -25,7 +25,7 @@ const (
 )
 
 func TestValidateHasAllRolesNilRoles(t *testing.T) {
-	claims := jwt.MapClaims{}
+	claims := auth.Data{}
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, auth.AuthorizationDataKey, claims)
 	err := auth.ValidateHasAllRoles(ctx, []*string{})
@@ -35,8 +35,8 @@ func TestValidateHasAllRolesNilRoles(t *testing.T) {
 }
 
 func TestValidateHasAllRolesEmptyRoles(t *testing.T) {
-	claims := jwt.MapClaims{
-		"roles": []interface{}{},
+	claims := auth.Data{
+		Roles: []string{},
 	}
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, auth.AuthorizationDataKey, claims)
@@ -49,8 +49,8 @@ func TestValidateHasAllRolesEmptyRoles(t *testing.T) {
 func TestValidateHasAllRolesClaimsWithoutAllRoles(t *testing.T) {
 	adminRole := "admin"
 	superAdmin := "super_admin"
-	claims := jwt.MapClaims{
-		"roles": []interface{}{adminRole},
+	claims := auth.Data{
+		Roles: []string{adminRole},
 	}
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, auth.AuthorizationDataKey, claims)
@@ -63,8 +63,8 @@ func TestValidateHasAllRolesClaimsWithoutAllRoles(t *testing.T) {
 func TestValidateHasAllRolesClaimsWithAllRoles(t *testing.T) {
 	adminRole := "admin"
 	superAdmin := "super_admin"
-	claims := jwt.MapClaims{
-		"roles": []interface{}{superAdmin, adminRole, "extra_role"},
+	claims := auth.Data{
+		Roles: []string{superAdmin, adminRole, "extra_role"},
 	}
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, auth.AuthorizationDataKey, claims)
@@ -84,7 +84,7 @@ func TestAddSecurityHandlerNoToken(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	handler := auth.AddSecurityHandler(configMock)(nil)
+	handler := auth.AddSecurityHandler(configMock, nil)(nil)
 	handler.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusBadRequest {
@@ -114,7 +114,7 @@ func TestAddSecurityHandlerErrorValidatingToken(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	handler := auth.AddSecurityHandler(configMock)(nil)
+	handler := auth.AddSecurityHandler(configMock, nil)(nil)
 	handler.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusBadRequest {
@@ -144,7 +144,7 @@ func TestAddSecurityHandlerInvalidToken(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	handler := auth.AddSecurityHandler(configMock)(nil)
+	handler := auth.AddSecurityHandler(configMock, nil)(nil)
 	handler.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusBadRequest {
@@ -174,7 +174,7 @@ func TestAddSecurityHandlerInvalidTokenSignature(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	handler := auth.AddSecurityHandler(configMock)(nil)
+	handler := auth.AddSecurityHandler(configMock, nil)(nil)
 	handler.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusBadRequest {
@@ -204,7 +204,7 @@ func TestAddSecurityHandlerValidToken(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	handler := auth.AddSecurityHandler(configMock)(oKHandler{})
+	handler := auth.AddSecurityHandler(configMock, nil)(oKHandler{})
 	handler.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusOK {
@@ -229,7 +229,12 @@ func (okHandler oKHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func generateToken(privateKey string) string {
 	// Declare the token with the algorithm used for signing, and the claims
-	token := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.StandardClaims{})
+	token := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.MapClaims{
+		"service": "my app",
+		"iss":     "me",
+		"roles":   []string{"admin", "user"},
+		"uid":     "sjdoa08du1ojke",
+	})
 	// Create the JWT string
 
 	key, err := jwt.ParseECPrivateKeyFromPEM([]byte(privateKey))
@@ -242,4 +247,40 @@ func generateToken(privateKey string) string {
 		panic(err)
 	}
 	return tokenString
+}
+
+func TestGetContextInfoAllEmpty(t *testing.T) {
+	ctx := context.Background()
+	authData, gc, c, coi := auth.GetContextInfo(ctx)
+	if authData != nil {
+		t.Errorf("authData should be nil, %v", authData)
+	} else if gc != nil {
+		t.Errorf("gc should be nil, %v", gc)
+	} else if c != nil {
+		t.Errorf("c should be nil, %v", c)
+	} else if coi != "" {
+		t.Errorf("coi should be empty, %v", coi)
+	}
+}
+
+func TestGetContextInfoAllNotEmpty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	gcMock := mock_config.NewMockIGlobalConfigs(ctrl)
+	cMock := mock_config.NewMockIConfigs(ctrl)
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, auth.AuthorizationDataKey, auth.Data{})
+	ctx = context.WithValue(ctx, auth.GlobalConfigsKey, gcMock)
+	ctx = context.WithValue(ctx, auth.ConfigsKey, cMock)
+	ctx = context.WithValue(ctx, auth.AppCoi, "coi")
+	authData, gc, c, coi := auth.GetContextInfo(ctx)
+	if authData == nil {
+		t.Error("authData should be nil")
+	} else if gc == nil {
+		t.Error("gc should be nil")
+	} else if c == nil {
+		t.Error("c should be nil")
+	} else if coi == "" {
+		t.Error("coi should not be empty")
+	}
 }
