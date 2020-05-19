@@ -1,5 +1,12 @@
 package errors
 
+import (
+	"context"
+
+	"github.com/99designs/gqlgen/graphql"
+	"github.com/vektah/gqlparser/v2/gqlerror"
+)
+
 // CustomError is a struct to custom error
 type CustomError struct {
 	Code    string
@@ -21,4 +28,19 @@ func New(code, message string) error {
 func (e CustomError) Error() string {
 	return e.Message
 
+}
+
+// HandleGraphqlError handle graphql with custom error
+func HandleGraphqlError() graphql.ErrorPresenterFunc {
+	return func(ctx context.Context, err error) *gqlerror.Error {
+		if customError, ok := err.(CustomError); ok {
+			gqlError := &gqlerror.Error{
+				Message:    customError.Message,
+				Extensions: map[string]interface{}{"code": customError.Code},
+			}
+			return gqlError
+		}
+
+		return graphql.DefaultErrorPresenter(ctx, err)
+	}
 }
